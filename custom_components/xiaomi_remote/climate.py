@@ -4,12 +4,12 @@ import homeassistant.helpers.config_validation as cv
 
 from homeassistant.components.climate import ClimateEntity, PLATFORM_SCHEMA
 from homeassistant.components.climate.const import (
-    HVAC_MODE_HEAT, HVAC_MODE_COOL, HVAC_MODE_AUTO, HVAC_MODE_OFF,
+    HVACMode,
     FAN_LOW, FAN_MEDIUM, FAN_HIGH, FAN_AUTO,
     ATTR_HVAC_MODE, ATTR_HVAC_MODES, ATTR_MAX_TEMP, ATTR_MIN_TEMP,
     ATTR_TARGET_TEMP_STEP, ATTR_FAN_MODE, ATTR_FAN_MODES,
     ATTR_PRESET_MODE, ATTR_PRESET_MODES,
-    SUPPORT_TARGET_TEMPERATURE, SUPPORT_FAN_MODE, SUPPORT_PRESET_MODE)
+    ClimateEntityFeature)
 from homeassistant.components.remote import (
     ATTR_COMMAND, DOMAIN, SERVICE_SEND_COMMAND)
 from homeassistant.const import (
@@ -37,10 +37,10 @@ DEFAULT_MIN_TEMP = 16
 DEFAULT_MAX_TEMP = 32
 DEFAULT_TARGET_TEMP = 24
 DEFAULT_TARGET_TEMP_STEP = 1
-DEFAULT_HVAC_MODES = [HVAC_MODE_OFF, HVAC_MODE_HEAT, HVAC_MODE_COOL, HVAC_MODE_AUTO]
+DEFAULT_HVAC_MODES = [HVACMode.OFF, HVACMode.HEAT, HVACMode.COOL, HVACMode.AUTO]
 DEFAULT_FAN_MODES = [FAN_LOW, FAN_MEDIUM, FAN_HIGH, FAN_AUTO]
 DEFAULT_PRESET_MODES = []
-DEFAULT_HVAC_MODE = HVAC_MODE_OFF
+DEFAULT_HVAC_MODE = HVACMode.OFF
 DEFAULT_FAN_MODE = FAN_AUTO
 DEFAULT_PRESET_MODE = None
 DEFAULT_PREFIX = 'raw:'
@@ -151,9 +151,14 @@ class RemoteClimate(ClimateEntity, RestoreEntity):
         self._fan_modes = fan_modes
         self._preset_modes = preset_modes
 
-        self._support_flags = SUPPORT_TARGET_TEMPERATURE | SUPPORT_FAN_MODE
+        self._support_flags = (
+            ClimateEntityFeature.TARGET_TEMPERATURE |
+            ClimateEntityFeature.FAN_MODE |
+            ClimateEntityFeature.TURN_ON |
+            ClimateEntityFeature.TURN_OFF
+        )
         if preset_modes:
-            self._support_flags |= SUPPORT_PRESET_MODE
+            self._support_flags |= ClimateEntityFeature.PRESET_MODE
         self._enabled_flags = self._support_flags
 
         if temp_entity_id:
@@ -191,7 +196,7 @@ class RemoteClimate(ClimateEntity, RestoreEntity):
         if isinstance(result, TemplateError):
             _LOGGER.warning('Unable to update power from template: %s', result)
         else:
-            self._current_hvac_mode = self._last_hvac_mode if result_as_boolean(result) else HVAC_MODE_OFF
+            self._current_hvac_mode = self._last_hvac_mode if result_as_boolean(result) else HVACMode.OFF
             self.schedule_update_ha_state()
 
     @property
@@ -281,7 +286,7 @@ class RemoteClimate(ClimateEntity, RestoreEntity):
     @property
     def is_on(self):
         """Return true if on."""
-        return self._current_hvac_mode != HVAC_MODE_OFF
+        return self._current_hvac_mode != HVACMode.OFF
 
     def _update_flags_get_command(self):
         """Update supported features list."""
@@ -295,10 +300,10 @@ class RemoteClimate(ClimateEntity, RestoreEntity):
             try:
                 if isinstance(self._commands[hvac_mode], str):
                     command = self._commands[hvac_mode]
-                    self._enabled_flags = self._support_flags ^ SUPPORT_TARGET_TEMPERATURE ^ SUPPORT_FAN_MODE
+                    self._enabled_flags = self._support_flags ^ ClimateEntityFeature.TARGET_TEMPERATURE ^ ClimateEntityFeature.FAN_MODE
                 elif isinstance(self._commands[hvac_mode][fan_mode], str):
                     command = self._commands[hvac_mode][fan_mode]
-                    self._enabled_flags = self._support_flags ^ SUPPORT_TARGET_TEMPERATURE
+                    self._enabled_flags = self._support_flags ^ ClimateEntityFeature.TARGET_TEMPERATURE
                 else:
                     command = self._commands[hvac_mode][fan_mode][temp]
                     self._enabled_flags = self._support_flags
@@ -350,7 +355,7 @@ class RemoteClimate(ClimateEntity, RestoreEntity):
     def set_hvac_mode(self, hvac_mode):
         """Set new target hvac mode."""
         self._current_hvac_mode = hvac_mode
-        if hvac_mode != HVAC_MODE_OFF:
+        if hvac_mode != HVACMode.OFF:
             self._last_hvac_mode = hvac_mode
         self._send_command()
         self.schedule_update_ha_state()
@@ -369,7 +374,7 @@ class RemoteClimate(ClimateEntity, RestoreEntity):
 
     def turn_off(self):
         """Turn device off."""
-        self.set_hvac_mode(HVAC_MODE_OFF)
+        self.set_hvac_mode(HVACMode.OFF)
 
     async def async_added_to_hass(self):
         """Run when entity about to be added."""
@@ -386,7 +391,7 @@ class RemoteClimate(ClimateEntity, RestoreEntity):
             self._target_temperature = state.attributes.get(ATTR_TEMPERATURE, self._target_temperature)
 
             enabled_flags = state.attributes.get(ATTR_SUPPORTED_FEATURES, self._enabled_flags)
-            if enabled_flags <= SUPPORT_TARGET_TEMPERATURE | SUPPORT_FAN_MODE | SUPPORT_PRESET_MODE:
+            if enabled_flags <= ClimateEntityFeature.TARGET_TEMPERATURE | ClimateEntityFeature.FAN_MODE | ClimateEntityFeature.PRESET_MODE:
                 self._enabled_flags = enabled_flags
 
         if self._temp_entity_id:
