@@ -1,4 +1,4 @@
-import logging 
+import logging
 import voluptuous as vol
 import homeassistant.helpers.config_validation as cv
 
@@ -151,12 +151,7 @@ class RemoteClimate(ClimateEntity, RestoreEntity):
         self._fan_modes = fan_modes
         self._preset_modes = preset_modes
 
-        self._support_flags = (
-            ClimateEntityFeature.TARGET_TEMPERATURE |
-            ClimateEntityFeature.FAN_MODE |
-            ClimateEntityFeature.TURN_ON |
-            ClimateEntityFeature.TURN_OFF
-        )
+        self._support_flags = ClimateEntityFeature.TARGET_TEMPERATURE | ClimateEntityFeature.FAN_MODE | ClimateEntityFeature.TURN_ON | ClimateEntityFeature.TURN_OFF
         if preset_modes:
             self._support_flags |= ClimateEntityFeature.PRESET_MODE
         self._enabled_flags = self._support_flags
@@ -390,7 +385,7 @@ class RemoteClimate(ClimateEntity, RestoreEntity):
             self._current_preset_mode = state.attributes.get(ATTR_PRESET_MODE, self._last_preset_mode)
             self._target_temperature = state.attributes.get(ATTR_TEMPERATURE, self._target_temperature)
 
-            enabled_flags = state.attributes.get(ATTR_SUPPORTED_FEATURES, self._enabled_flags)
+            enabled_flags = ClimateEntityFeature(state.attributes.get(ATTR_SUPPORTED_FEATURES, self._enabled_flags))
             if enabled_flags <= ClimateEntityFeature.TARGET_TEMPERATURE | ClimateEntityFeature.FAN_MODE | ClimateEntityFeature.PRESET_MODE:
                 self._enabled_flags = enabled_flags
 
